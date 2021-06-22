@@ -1,12 +1,13 @@
 package secret
 
 import (
+	"errors"
 	"html/template"
 	"os"
 
-	"github.com/urfave/cli"
-
 	"github.com/drone/drone-cli/drone/internal"
+	"github.com/drone/funcmap"
+	"github.com/urfave/cli"
 )
 
 var secretInfoCmd = cli.Command{
@@ -37,6 +38,9 @@ func secretInfo(c *cli.Context) error {
 		repoName   = c.String("repository")
 		format     = c.String("format") + "\n"
 	)
+	if secretName == "" {
+		return errors.New("Missing secret name")
+	}
 	if repoName == "" {
 		repoName = c.Args().First()
 	}
@@ -52,7 +56,7 @@ func secretInfo(c *cli.Context) error {
 	if err != nil {
 		return err
 	}
-	tmpl, err := template.New("_").Parse(format)
+	tmpl, err := template.New("_").Funcs(funcmap.Funcs).Parse(format)
 	if err != nil {
 		return err
 	}

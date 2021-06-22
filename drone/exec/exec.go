@@ -3,6 +3,7 @@ package exec
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net/url"
@@ -96,8 +97,10 @@ var Command = cli.Command{
 			Usage: "privileged plugins",
 			Value: &cli.StringSlice{
 				"plugins/docker",
-				"plugins/gcr",
+				"plugins/acr",
 				"plugins/ecr",
+				"plugins/gcr",
+				"plugins/heroku",
 			},
 		},
 
@@ -133,6 +136,10 @@ var Command = cli.Command{
 		cli.StringFlag{
 			Name:  "ref",
 			Usage: "git reference",
+		},
+		cli.StringFlag{
+			Name:  "sha",
+			Usage: "git sha",
 		},
 		cli.StringFlag{
 			Name:  "repo",
@@ -186,6 +193,11 @@ func exec(c *cli.Context) error {
 		if !ok {
 			continue
 		}
+
+		if v.Type != "" && v.Type != "docker" {
+			return fmt.Errorf("pipeline type (%s) is not supported with 'drone exec'", v.Type)
+		}
+
 		if filter == "" || filter == v.Name {
 			pipeline = v
 			break

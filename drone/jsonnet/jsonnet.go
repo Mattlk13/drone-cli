@@ -2,10 +2,12 @@ package jsonnet
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/drone/drone-yaml/yaml"
 	"github.com/drone/drone-yaml/yaml/pretty"
@@ -39,7 +41,7 @@ var Command = cli.Command{
 			Name:  "stream",
 			Usage: "Write output as a YAML stream.",
 		},
-		cli.BoolTFlag{
+		cli.BoolFlag{
 			Name:  "format",
 			Usage: "Write output as formatted YAML",
 		},
@@ -50,6 +52,10 @@ var Command = cli.Command{
 		cli.BoolFlag{
 			Name:  "string",
 			Usage: "Expect a string, manifest as plain text",
+		},
+		cli.StringSliceFlag{
+			Name:  "extVar, V",
+			Usage: "Pass extVars to Jsonnet (can be specified multiple times)",
 		},
 	},
 }
@@ -74,6 +80,16 @@ func generate(c *cli.Context) error {
 	// register native functions
 	RegisterNativeFuncs(vm)
 
+	// extVars
+	vars := c.StringSlice("extVar")
+	for _, v := range vars {
+		name, value, err := getVarVal(v)
+		if err != nil {
+			return err
+		}
+		vm.ExtVar(name, value)
+	}
+
 	buf := new(bytes.Buffer)
 	if c.Bool("stream") {
 		docs, err := vm.EvaluateSnippetStream(source, string(data))
@@ -93,9 +109,8 @@ func generate(c *cli.Context) error {
 		buf.WriteString(result)
 	}
 
-	// the yaml file is parsed and formatted by default. This
-	// can be disabled for --format=false.
-	if c.BoolT("format") {
+	// enable yaml formatting with --format
+	if c.Bool("format") {
 		manifest, err := yaml.Parse(buf)
 		if err != nil {
 			return err
@@ -113,4 +128,18 @@ func generate(c *cli.Context) error {
 	}
 
 	return ioutil.WriteFile(target, buf.Bytes(), 0644)
+}
+
+// https://github.com/google/go-jsonnet/blob/master/cmd/jsonnet/cmd.go#L149
+func getVarVal(s string) (string, string, error) {
+	parts := strings.SplitN(s, "=", 2)
+	name := parts[0]
+	if len(parts) == 1 {
+		content, exists := os.LookupEnv(name)
+		if exists {
+			return name, content, nil
+		}
+		return "", "", fmt.Errorf("environment variable %v was undefined", name)
+	}
+	return name, parts[1], nil
 }

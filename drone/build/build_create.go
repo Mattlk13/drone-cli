@@ -2,7 +2,6 @@ package build
 
 import (
 	"os"
-	"strconv"
 	"text/template"
 
 	"github.com/drone/drone-cli/drone/internal"
@@ -10,12 +9,20 @@ import (
 	"github.com/urfave/cli"
 )
 
-var buildPromoteCmd = cli.Command{
-	Name:      "promote",
-	Usage:     "promote a build",
-	ArgsUsage: "<repo/name> <build> <environment>",
-	Action:    buildPromote,
+var buildCreateCmd = cli.Command{
+	Name:      "create",
+	Usage:     "create a build",
+	ArgsUsage: "<repo/name>",
+	Action:    buildCreate,
 	Flags: []cli.Flag{
+		cli.StringFlag{
+			Name:  "commit",
+			Usage: "source commit",
+		},
+		cli.StringFlag{
+			Name:  "branch",
+			Usage: "source branch",
+		},
 		cli.StringSliceFlag{
 			Name:  "param, p",
 			Usage: "custom parameters to be injected into the job environment. Format: KEY=value",
@@ -28,25 +35,20 @@ var buildPromoteCmd = cli.Command{
 	},
 }
 
-func buildPromote(c *cli.Context) (err error) {
+func buildCreate(c *cli.Context) (err error) {
 	repo := c.Args().First()
 	owner, name, err := internal.ParseRepo(repo)
 	if err != nil {
 		return err
 	}
-	number, err := strconv.Atoi(c.Args().Get(1))
-	if err != nil {
-		return err
-	}
-	target := c.Args().Get(2)
-	params := internal.ParseKeyPair(c.StringSlice("param"))
 
 	client, err := internal.NewClient(c)
 	if err != nil {
 		return err
 	}
 
-	build, err := client.Promote(owner, name, number, target, params)
+	params := internal.ParseKeyPair(c.StringSlice("param"))
+	build, err := client.BuildCreate(owner, name, c.String("commit"), c.String("branch"), params)
 	if err != nil {
 		return err
 	}

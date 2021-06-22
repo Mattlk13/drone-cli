@@ -24,6 +24,9 @@ var Command = cli.Command{
 	ArgsUsage: "[path/to/.drone.star]",
 	Action: func(c *cli.Context) {
 		if err := generate(c); err != nil {
+			if err, ok := err.(*starlark.EvalError); ok {
+				log.Fatalf("starlark evaluation error:\n%s", err.Backtrace())
+			}
 			log.Fatalln(err)
 		}
 	},
@@ -45,6 +48,11 @@ var Command = cli.Command{
 		cli.BoolFlag{
 			Name:  "stdout",
 			Usage: "Write output to stdout",
+		},
+		cli.Uint64Flag{
+			Name:  "max-execution-steps",
+			Usage: "maximum number of execution steps",
+			Value: 50000,
 		},
 		//
 		// Drone Parameters
@@ -78,6 +86,10 @@ var Command = cli.Command{
 			Value: "master",
 		},
 		cli.StringFlag{
+			Name:  "build.source_repo",
+			Usage: "repo slug of source repository",
+		},
+		cli.StringFlag{
 			Name:  "build.target",
 			Usage: "build target branch",
 			Value: "master",
@@ -94,6 +106,22 @@ var Command = cli.Command{
 		cli.StringFlag{
 			Name:  "build.message",
 			Usage: "build commit message",
+		},
+		cli.StringFlag{
+			Name:  "build.title",
+			Usage: "build title",
+		},
+		cli.StringFlag{
+			Name:  "build.link",
+			Usage: "build link",
+		},
+		cli.StringFlag{
+			Name:  "build.environment",
+			Usage: "build environment",
+		},
+		cli.BoolTFlag{
+			Name:  "build.debug",
+			Usage: "debug build",
 		},
 	},
 }
@@ -134,13 +162,18 @@ func generate(c *cli.Context) error {
 	}
 
 	build := starlark.StringDict{
-		"event":   starlark.String(c.String("build.event")),
-		"branch":  starlark.String(c.String("build.branch")),
-		"source":  starlark.String(c.String("build.source_branch")),
-		"target":  starlark.String(c.String("build.target_branch")),
-		"ref":     starlark.String(c.String("build.ref")),
-		"commit":  starlark.String(c.String("build.commit")),
-		"message": starlark.String(c.String("build.message")),
+		"event":       starlark.String(c.String("build.event")),
+		"branch":      starlark.String(c.String("build.branch")),
+		"source":      starlark.String(c.String("build.source_branch")),
+		"source_repo": starlark.String(c.String("build.source_repo")),
+		"target":      starlark.String(c.String("build.target_branch")),
+		"ref":         starlark.String(c.String("build.ref")),
+		"commit":      starlark.String(c.String("build.commit")),
+		"message":     starlark.String(c.String("build.message")),
+		"title":       starlark.String(c.String("build.title")),
+		"link":        starlark.String(c.String("build.link")),
+		"environment": starlark.String(c.String("build.environment")),
+		"debug":       starlark.Bool(c.Bool("build.debug")),
 	}
 
 	args := starlark.Tuple([]starlark.Value{
@@ -152,6 +185,7 @@ func generate(c *cli.Context) error {
 			},
 		),
 	})
+	thread.SetMaxExecutionSteps(c.Uint64("max-execution-steps"))
 	mainVal, err = starlark.Call(thread, main, args, nil)
 	if err != nil {
 		return err

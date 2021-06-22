@@ -1,39 +1,42 @@
-package orgsecret
+package template
 
 import (
-	"html/template"
 	"os"
+	"text/template"
 
 	"github.com/drone/drone-cli/drone/internal"
 	"github.com/drone/funcmap"
 	"github.com/urfave/cli"
 )
 
-var secretInfoCmd = cli.Command{
-	Name:      "info",
-	Usage:     "display secret info",
-	ArgsUsage: "[organization] [name]",
-	Action:    secretInfo,
+var templateListCmd = cli.Command{
+	Name:      "ls",
+	Usage:     "list templates",
+	ArgsUsage: "[namespace]",
+	Action:    templateList,
 	Flags: []cli.Flag{
+		cli.StringFlag{
+			Name:  "namespace",
+			Usage: "namespace (e.g. octocat)",
+		},
 		cli.StringFlag{
 			Name:  "format",
 			Usage: "format output",
-			Value: tmplSecretList,
+			Value: tmplTemplateInfoList,
 		},
 	},
 }
 
-func secretInfo(c *cli.Context) error {
+func templateList(c *cli.Context) error {
 	var (
 		namespace = c.Args().First()
-		name      = c.Args().Get(1)
 		format    = c.String("format") + "\n"
 	)
 	client, err := internal.NewClient(c)
 	if err != nil {
 		return err
 	}
-	secret, err := client.OrgSecret(namespace, name)
+	list, err := client.TemplateList(namespace)
 	if err != nil {
 		return err
 	}
@@ -41,5 +44,8 @@ func secretInfo(c *cli.Context) error {
 	if err != nil {
 		return err
 	}
-	return tmpl.Execute(os.Stdout, secret)
+	for _, templates := range list {
+		tmpl.Execute(os.Stdout, templates)
+	}
+	return nil
 }
